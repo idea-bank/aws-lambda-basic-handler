@@ -37,7 +37,8 @@ activate: ## Activate the virtual environment for bootstrapping (does NOT activa
 test: bootstrap ## Run unittests on the source directory
 	@( \
 		source .venv/bin/activate; \
-		python3 $(SERVICE_TESTER); \
+		coverage run $(SERVICE_TESTER); \
+		coverage report -m; \
 	)
 
 .PHONY: lint
