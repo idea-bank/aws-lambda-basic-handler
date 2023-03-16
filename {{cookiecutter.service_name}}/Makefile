@@ -1,10 +1,12 @@
-# Makefile for ideabank {{cookiecutter.service_name}} service
-
-SERVICE_NAME={{cookiecutter.service_name}}
-SOURCES=function.py ## Add more files as needed as a space separated list
+# Makefile for ideabank {{service_name}} service
+#
+SERVICE_NAME={{service_name}}
+SOURCES=function.py
 DEPS=.venv/lib/python3.9/site-packages/*
 SERVICE_TESTER=test_function.py
-SERVICE_CREDS=$(AWS_SERVICE) ## This is an environment variable
+SERVICE_CREDS=$(AWS_SERVICE)
+EXEC_ROLE={{service_execution_policy}}
+BRANCH=$(shell git branch --show-current)
 
 help:
 	@echo "Makefile for ideabank $(SERVICE_NAME) service. Available targets:"
@@ -22,7 +24,10 @@ clean-pyc: ## Remove package artifacts and cached byte code
 clean-zip: ## Remove package zip archive
 	find . -name $(SERVICE_NAME).zip -exec rm -f {} +
 
-clean: clean-pyc clean-venv clean-zip ## Clean up develepment environment
+clean-cov: ## Remove coverage artifacts
+	find . -name .coverage -exec rm -f {} +
+
+clean: clean-pyc clean-venv clean-zip clean-cov ## Clean up develepment environment
 
 activate: ## Activate the virtual environment for bootstrapping (does NOT activate for you).
 	@echo 
@@ -65,9 +70,44 @@ docker: lint test ## Test the microservice in a local docker environment
 	docker run -p 9000:8080 $(SERVICE_NAME)
 
 deploy: zip ## Deploy the microservice to AWS lambda
-ifeq ($(shell git branch --show-current), main)
-	aws lambda update-function-code --function-name $(SERVICE_NAME) --zip-file fileb://$(SERVICE_NAME).zip --profile=$(SERVICE_CREDS)
-else
-	$(error Not deploying. Expected banch to be `main`, was $(shell git branch --show-current) instead)
-endif
+	@( \
+		if [ $(BRANCH) == "main" ]; then \
+			aws lambda list-functions --profile=$(SERVICE_CREDS) | grep $(SERVICE_NAME)-prod; \
+			if [ $? -eq 0 ]; then \
+				aws lambda update-function-code \
+					--function-name $(SERVICE_NAME)-prod \
+					--zip-file fileb://$(SERVICE_NAME).zip \
+					--profile=$(SERVICE_CREDS); \
+			else \
+				aws lambda create-function \
+					--function-name=$(SERVICE_NAME)-prod \
+					--handler=function.handler \
+					--zip-file fileb://$(SERVICE_NAME).zip \
+					--role=$(EXEC_ROLE) \
+					--runtime=python3.9 \
+					--environment=Variables={"ENV"="prod"} \
+					--profile=$(SERVICE_CREDS); \
+			fi \
+		elif [ $(BRANCH) == "dev" ]; then \
+			aws lambda list-functions --profile=$(SERVICE_CREDS) | grep $(SERVICE_NAME)-dev; \
+			if [ $? -eq 0 ]; then \
+				aws lambda update-function-code \
+					--function-name $(SERVICE_NAME)-dev \
+					--zip-file fileb://$(SERVICE_NAME).zip \
+					--profile=$(SERVICE_CREDS); \
+			else \
+				aws lambda create-function \
+					--function-name=$(SERVICE_NAME)-dev \
+					--handler=function.handler \
+					--zip-file fileb://$(SERVICE_NAME).zip \
+					--role=$(EXEC_ROLE) \
+					--runtime=python3.9 \
+					--environment=Variables={"ENV"="dev"} \
+					--profile=$(SERVICE_CREDS); \
+			fi \
+		else \
+			echo Not deploying, can only deploy on main or dev branches; \
+			exit 1; \
+		fi \
+	)
 
