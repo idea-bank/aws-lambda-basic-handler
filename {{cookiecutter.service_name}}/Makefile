@@ -1,11 +1,11 @@
-# Makefile for ideabank {{service_name}} service
+# Makefile for ideabank {{cookiecutter.service_name}} service
 #
-SERVICE_NAME={{service_name}}
+SERVICE_NAME={{cookiecutter.service_name}}
 SOURCES=function.py
 DEPS=.venv/lib/python3.9/site-packages/*
 SERVICE_TESTER=test_function.py
 SERVICE_CREDS=$(AWS_SERVICE)
-EXEC_ROLE={{service_execution_policy}}
+EXEC_ROLE={{cookiecutter.service_execution_policy}}
 BRANCH=$(shell git branch --show-current)
 
 help:
