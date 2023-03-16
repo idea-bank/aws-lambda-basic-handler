@@ -1,5 +1,6 @@
 {
     "service_name": "service-name",
     "service_author": "Your Name",
+    "service_execution_policy": "Paste the role ARN you'd like to use",
     "service_description": "Describe your new service"
 }
