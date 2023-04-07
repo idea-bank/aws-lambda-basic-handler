@@ -5,7 +5,8 @@ SOURCES=function.py
 DEPS=.venv/lib/python3.9/site-packages/*
 SERVICE_TESTER=test_function.py
 SERVICE_CREDS=$(AWS_SERVICE)
-EXEC_ROLE={{cookiecutter.service_execution_policy}}
+DEV_EXEC_ROLE={{cookiecutter.service_execution_policy_dev}}
+PROD_EXEC_ROLE={{cookiecutter.service_execution_policy_prod}}
 BRANCH=$(shell git branch --show-current)
 
 help:
@@ -53,7 +54,7 @@ lint: bootstrap ## Run lint checks on the source directory
 		pylint $(SOURCES); \
 	)
 
-zip: test lint
+pack: test lint
 	zip $(SERVICE_NAME).zip $(SOURCES) $(DEPS)
 
 bootstrap: venv ## Bootstrap the virtual environment
@@ -69,11 +70,11 @@ docker: lint test ## Test the microservice in a local docker environment
 	docker build -t $(SERVICE_NAME) .
 	docker run -p 9000:8080 $(SERVICE_NAME)
 
-deploy: zip ## Deploy the microservice to AWS lambda
+deploy: pack ## Deploy the microservice to AWS lambda
 	@( \
 		if [ $(BRANCH) == "main" ]; then \
 			aws lambda list-functions --profile=$(SERVICE_CREDS) | grep $(SERVICE_NAME)-prod; \
-			if [ $? -eq 0 ]; then \
+			if [ $$? -eq 0 ]; then \
 				aws lambda update-function-code \
 					--function-name $(SERVICE_NAME)-prod \
 					--zip-file fileb://$(SERVICE_NAME).zip \
@@ -83,14 +84,14 @@ deploy: zip ## Deploy the microservice to AWS lambda
 					--function-name=$(SERVICE_NAME)-prod \
 					--handler=function.handler \
 					--zip-file fileb://$(SERVICE_NAME).zip \
-					--role=$(EXEC_ROLE) \
+					--role=$(PROD_EXEC_ROLE) \
 					--runtime=python3.9 \
 					--environment=Variables={"ENV"="prod"} \
 					--profile=$(SERVICE_CREDS); \
 			fi \
 		elif [ $(BRANCH) == "dev" ]; then \
 			aws lambda list-functions --profile=$(SERVICE_CREDS) | grep $(SERVICE_NAME)-dev; \
-			if [ $? -eq 0 ]; then \
+			if [ $$? -eq 0 ]; then \
 				aws lambda update-function-code \
 					--function-name $(SERVICE_NAME)-dev \
 					--zip-file fileb://$(SERVICE_NAME).zip \
@@ -100,7 +101,7 @@ deploy: zip ## Deploy the microservice to AWS lambda
 					--function-name=$(SERVICE_NAME)-dev \
 					--handler=function.handler \
 					--zip-file fileb://$(SERVICE_NAME).zip \
-					--role=$(EXEC_ROLE) \
+					--role=$(DEV_EXEC_ROLE) \
 					--runtime=python3.9 \
 					--environment=Variables={"ENV"="dev"} \
 					--profile=$(SERVICE_CREDS); \
