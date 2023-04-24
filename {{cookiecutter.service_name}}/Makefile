@@ -2,7 +2,7 @@
 #
 SERVICE_NAME={{cookiecutter.service_name}}
 SOURCES=function.py
-DEPS=.venv/lib/python3.9/site-packages/*
+DEPS=.venv/lib/python3.9/site-packages/
 SERVICE_TESTER=test_function.py
 SERVICE_CREDS=$(AWS_SERVICE)
 DEV_EXEC_ROLE={{cookiecutter.service_execution_policy_dev}}
@@ -54,8 +54,18 @@ lint: bootstrap ## Run lint checks on the source directory
 		pylint $(SOURCES); \
 	)
 
-pack: test lint
-	zip $(SERVICE_NAME).zip $(SOURCES) $(DEPS)
+zip: test lint clean
+	[ -d .venv ] || python3.9 -m venv .venv --prompt=ideabank-$(SERVICE_NAME)
+	@( \
+		source .venv/bin/activate; \
+		pip3 install --upgrade pip; \
+		pip3 install --require-virtualenv -r requirements.txt; \
+		deactivate; \
+		cd $(DEPS); \
+		zip -r ../../../../$(SERVICE_NAME).zip .; \
+		cd ../../../../; \
+		zip -g $(SERVICE_NAME).zip $(SOURCES); \
+	)
 
 bootstrap: venv ## Bootstrap the virtual environment
 	@( \
